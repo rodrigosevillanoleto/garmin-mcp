@@ -31,7 +31,7 @@ def safe_call(fn, *args, **kwargs):
 TOOLS = [
     {
         "name": "get_activities",
-        "description": "Lista as atividades (treinos executados) mais recentes. Parametro: limit (int, padrao 10).",
+        "description": "Lista as atividades mais recentes. Parametro: limit (int, padrao 10).",
         "inputSchema": {
             "type": "object",
             "properties": {"limit": {"type": "integer", "default": 10}}
@@ -39,7 +39,7 @@ TOOLS = [
     },
     {
         "name": "get_activities_by_date",
-        "description": "Atividades em um intervalo de datas. Parametros obrigatorios: start_date e end_date (YYYY-MM-DD).",
+        "description": "Atividades em um intervalo de datas. Parametros: start_date e end_date (YYYY-MM-DD).",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -51,7 +51,7 @@ TOOLS = [
     },
     {
         "name": "get_activity_details",
-        "description": "Metricas detalhadas de uma atividade especifica. Parametro: activity_id.",
+        "description": "Metricas detalhadas de uma atividade. Parametro: activity_id.",
         "inputSchema": {
             "type": "object",
             "properties": {"activity_id": {"type": "string"}},
@@ -60,7 +60,7 @@ TOOLS = [
     },
     {
         "name": "get_activity_splits",
-        "description": "Splits (parciais por km/milha) de uma atividade. Parametro: activity_id.",
+        "description": "Splits de uma atividade. Parametro: activity_id.",
         "inputSchema": {
             "type": "object",
             "properties": {"activity_id": {"type": "string"}},
@@ -69,7 +69,7 @@ TOOLS = [
     },
     {
         "name": "get_activity_hr_zones",
-        "description": "Tempo gasto em cada zona de frequencia cardiaca. Parametro: activity_id.",
+        "description": "Tempo em cada zona de FC. Parametro: activity_id.",
         "inputSchema": {
             "type": "object",
             "properties": {"activity_id": {"type": "string"}},
@@ -78,17 +78,17 @@ TOOLS = [
     },
     {
         "name": "get_training_plans",
-        "description": "Lista todos os planos de treino (Garmin Coach ou customizados).",
+        "description": "Lista todos os planos de treino.",
         "inputSchema": {"type": "object", "properties": {}}
     },
     {
         "name": "get_workouts",
-        "description": "Lista os treinos salvos (workouts).",
+        "description": "Lista os treinos salvos.",
         "inputSchema": {"type": "object", "properties": {}}
     },
     {
         "name": "get_calendar",
-        "description": "Calendario de treinos programados de um mes. Parametros: year (int) e month (int, 1-12).",
+        "description": "Calendario de treinos programados. Parametros: year (int) e month (int, 1-12).",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -100,7 +100,7 @@ TOOLS = [
     },
     {
         "name": "get_vo2max",
-        "description": "VO2 Max de corrida e ciclismo para uma data. Parametro opcional: target_date (YYYY-MM-DD).",
+        "description": "VO2 Max de corrida e ciclismo. Parametro opcional: target_date (YYYY-MM-DD).",
         "inputSchema": {
             "type": "object",
             "properties": {"target_date": {"type": "string"}}
@@ -108,7 +108,7 @@ TOOLS = [
     },
     {
         "name": "get_training_status",
-        "description": "Status de treinamento atual (produtivo, mantendo, destreinando, pico, recuperacao, overreaching).",
+        "description": "Status de treinamento atual.",
         "inputSchema": {"type": "object", "properties": {}}
     },
     {
@@ -121,22 +121,22 @@ TOOLS = [
     },
     {
         "name": "get_personal_records",
-        "description": "Recordes pessoais: melhor 5K, 10K, meia maratona, maratona, maior corrida, etc.",
+        "description": "Recordes pessoais (5K, 10K, meia, maratona, etc).",
         "inputSchema": {"type": "object", "properties": {}}
     },
     {
         "name": "get_race_predictions",
-        "description": "Previsao de tempo de prova para 5K, 10K, meia maratona e maratona baseada na sua forma atual.",
+        "description": "Previsao de tempo para 5K, 10K, meia e maratona.",
         "inputSchema": {"type": "object", "properties": {}}
     },
     {
         "name": "get_lactate_threshold",
-        "description": "Limiar de lactato: FC e ritmo no limiar.",
+        "description": "Limiar de lactato: FC e ritmo.",
         "inputSchema": {"type": "object", "properties": {}}
     },
     {
         "name": "get_daily_summary",
-        "description": "Resumo diario completo: passos, calorias totais e ativas, distancia, andares, minutos ativos, FC repouso. Parametro opcional: target_date (YYYY-MM-DD), padrao hoje.",
+        "description": "Resumo diario completo: passos, calorias totais e ativas, distancia, andares, minutos ativos, FC repouso. Parametro opcional: target_date (YYYY-MM-DD).",
         "inputSchema": {
             "type": "object",
             "properties": {"target_date": {"type": "string"}}
@@ -144,7 +144,7 @@ TOOLS = [
     },
     {
         "name": "get_daily_steps_range",
-        "description": "Passos diarios em um intervalo de datas. Parametros obrigatorios: start_date e end_date (YYYY-MM-DD).",
+        "description": "Passos diarios em um intervalo de datas. Parametros: start_date e end_date (YYYY-MM-DD).",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -156,7 +156,7 @@ TOOLS = [
     },
     {
         "name": "get_hydration",
-        "description": "Hidratacao (ingestao de agua) para uma data. Parametro opcional: target_date (YYYY-MM-DD).",
+        "description": "Hidratacao para uma data. Parametro opcional: target_date (YYYY-MM-DD).",
         "inputSchema": {
             "type": "object",
             "properties": {"target_date": {"type": "string"}}
@@ -164,12 +164,12 @@ TOOLS = [
     },
     {
         "name": "get_endurance_score",
-        "description": "Endurance Score: avaliacao da capacidade aerobica acumulada.",
+        "description": "Endurance Score.",
         "inputSchema": {"type": "object", "properties": {}}
     },
     {
         "name": "get_hill_score",
-        "description": "Hill Score: avaliacao da capacidade de subida e descida.",
+        "description": "Hill Score.",
         "inputSchema": {"type": "object", "properties": {}}
     }
 ]
@@ -254,4 +254,51 @@ def json_rpc(id_, result=None, error=None):
 @app.route("/", methods=["GET"])
 def index():
     key = request.args.get("key")
-    if not AUTH_KEY or ke
+    if not AUTH_KEY or key != AUTH_KEY:
+        return Response("Unauthorized", status=401)
+    return Response("Garmin MCP server is running.", status=200)
+
+@app.route("/", methods=["POST"])
+def mcp():
+    key = request.args.get("key")
+    if not AUTH_KEY or key != AUTH_KEY:
+        return Response("Unauthorized", status=401)
+
+    try:
+        payload = request.get_json(force=True)
+    except Exception:
+        return json_rpc(None, error={"code": -32700, "message": "Parse error"})
+
+    id_ = payload.get("id")
+    method = payload.get("method")
+    params = payload.get("params") or {}
+
+    try:
+        if method == "initialize":
+            return json_rpc(id_, {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "garmin-mcp", "version": "1.1.0"}
+            })
+
+        if method == "tools/list":
+            return json_rpc(id_, {"tools": TOOLS})
+
+        if method == "tools/call":
+            tool_name = params.get("name")
+            tool_args = params.get("arguments") or {}
+            data = call_tool(tool_name, tool_args)
+            text = json.dumps(data, default=str, ensure_ascii=False)
+            return json_rpc(id_, {"content": [{"type": "text", "text": text}]})
+
+        if method == "notifications/initialized":
+            return Response(status=204)
+
+        return json_rpc(id_, error={"code": -32601, "message": "Method not found"})
+
+    except Exception as e:
+        return json_rpc(id_, error={"code": -32603, "message": str(e)})
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
