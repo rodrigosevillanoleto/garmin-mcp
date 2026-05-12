@@ -108,7 +108,7 @@ TOOLS = [
     },
     {
         "name": "get_training_status",
-        "description": "Status de treinamento atual.",
+        "description": "Status de treinamento atual (produtivo, mantendo, destreinando, pico, recuperacao, overreaching).",
         "inputSchema": {"type": "object", "properties": {}}
     },
     {
@@ -118,6 +118,59 @@ TOOLS = [
             "type": "object",
             "properties": {"target_date": {"type": "string"}}
         }
+    },
+    {
+        "name": "get_personal_records",
+        "description": "Recordes pessoais: melhor 5K, 10K, meia maratona, maratona, maior corrida, etc.",
+        "inputSchema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "get_race_predictions",
+        "description": "Previsao de tempo de prova para 5K, 10K, meia maratona e maratona baseada na sua forma atual.",
+        "inputSchema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "get_lactate_threshold",
+        "description": "Limiar de lactato: FC e ritmo no limiar.",
+        "inputSchema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "get_daily_summary",
+        "description": "Resumo diario completo: passos, calorias totais e ativas, distancia, andares, minutos ativos, FC repouso. Parametro opcional: target_date (YYYY-MM-DD), padrao hoje.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"target_date": {"type": "string"}}
+        }
+    },
+    {
+        "name": "get_daily_steps_range",
+        "description": "Passos diarios em um intervalo de datas. Parametros obrigatorios: start_date e end_date (YYYY-MM-DD).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "start_date": {"type": "string"},
+                "end_date": {"type": "string"}
+            },
+            "required": ["start_date", "end_date"]
+        }
+    },
+    {
+        "name": "get_hydration",
+        "description": "Hidratacao (ingestao de agua) para uma data. Parametro opcional: target_date (YYYY-MM-DD).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"target_date": {"type": "string"}}
+        }
+    },
+    {
+        "name": "get_endurance_score",
+        "description": "Endurance Score: avaliacao da capacidade aerobica acumulada.",
+        "inputSchema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "get_hill_score",
+        "description": "Hill Score: avaliacao da capacidade de subida e descida.",
+        "inputSchema": {"type": "object", "properties": {}}
     }
 ]
 
@@ -162,6 +215,32 @@ def call_tool(name, args):
         target = args.get("target_date", today)
         return safe_call(client.get_training_readiness, target)
 
+    if name == "get_personal_records":
+        return safe_call(client.get_personal_record)
+
+    if name == "get_race_predictions":
+        return safe_call(client.get_race_predictions)
+
+    if name == "get_lactate_threshold":
+        return safe_call(client.get_lactate_threshold)
+
+    if name == "get_daily_summary":
+        target = args.get("target_date", today)
+        return safe_call(client.get_stats_and_body, target)
+
+    if name == "get_daily_steps_range":
+        return safe_call(client.get_daily_steps, args["start_date"], args["end_date"])
+
+    if name == "get_hydration":
+        target = args.get("target_date", today)
+        return safe_call(client.get_hydration_data, target)
+
+    if name == "get_endurance_score":
+        return safe_call(client.get_endurance_score, today)
+
+    if name == "get_hill_score":
+        return safe_call(client.get_hill_score, today)
+
     raise ValueError("Ferramenta desconhecida: " + name)
 
 def json_rpc(id_, result=None, error=None):
@@ -175,51 +254,4 @@ def json_rpc(id_, result=None, error=None):
 @app.route("/", methods=["GET"])
 def index():
     key = request.args.get("key")
-    if not AUTH_KEY or key != AUTH_KEY:
-        return Response("Unauthorized", status=401)
-    return Response("Garmin MCP server is running.", status=200)
-
-@app.route("/", methods=["POST"])
-def mcp():
-    key = request.args.get("key")
-    if not AUTH_KEY or key != AUTH_KEY:
-        return Response("Unauthorized", status=401)
-
-    try:
-        payload = request.get_json(force=True)
-    except Exception:
-        return json_rpc(None, error={"code": -32700, "message": "Parse error"})
-
-    id_ = payload.get("id")
-    method = payload.get("method")
-    params = payload.get("params") or {}
-
-    try:
-        if method == "initialize":
-            return json_rpc(id_, {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {"tools": {}},
-                "serverInfo": {"name": "garmin-mcp", "version": "1.0.0"}
-            })
-
-        if method == "tools/list":
-            return json_rpc(id_, {"tools": TOOLS})
-
-        if method == "tools/call":
-            tool_name = params.get("name")
-            tool_args = params.get("arguments") or {}
-            data = call_tool(tool_name, tool_args)
-            text = json.dumps(data, default=str, ensure_ascii=False)
-            return json_rpc(id_, {"content": [{"type": "text", "text": text}]})
-
-        if method == "notifications/initialized":
-            return Response(status=204)
-
-        return json_rpc(id_, error={"code": -32601, "message": "Method not found"})
-
-    except Exception as e:
-        return json_rpc(id_, error={"code": -32603, "message": str(e)})
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    if not AUTH_KEY or ke
