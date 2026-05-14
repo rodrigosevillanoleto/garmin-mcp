@@ -1,6 +1,8 @@
 import os
 import json
-from datetime import date, timedelta
+import base64
+from datetime import date
+from pathlib import Path
 from flask import Flask, request, jsonify, Response
 from garminconnect import Garmin
 
@@ -10,23 +12,113 @@ GARMIN_EMAIL = os.environ.get("GARMIN_EMAIL")
 GARMIN_PASSWORD = os.environ.get("GARMIN_PASSWORD")
 AUTH_KEY = os.environ.get("AUTH_KEY")
 
+# Tokens OAuth do Garmin (em base64, vindos das env vars do Render).
+# Servem como fallback persistente caso o /tmp seja limpo.
+GARMIN_OAUTH1_B64 = os.environ.get("GARMIN_OAUTH1_B64")
+GARMIN_OAUTH2_B64 = os.environ.get("GARMIN_OAUTH2_B64")
+
+TOKEN_DIR = "/tmp/garmin_tokens"
+OAUTH1_FILE = os.path.join(TOKEN_DIR, "oauth1_token.json")
+OAUTH2_FILE = os.path.join(TOKEN_DIR, "oauth2_token.json")
+
 _garmin_client = None
 
+
+def _hydrate_token_dir_from_env():
+    """
+    Se /tmp foi limpo mas temos os tokens em env vars,
+    recria o diretorio de tokens em disco a partir do base64.
+    """
+    if not (GARMIN_OAUTH1_B64 and GARMIN_OAUTH2_B64):
+        return False
+
+    if os.path.exists(OAUTH1_FILE) and os.path.exists(OAUTH2_FILE):
+        return True
+
+    try:
+        Path(TOKEN_DIR).mkdir(parents=True, exist_ok=True)
+        with open(OAUTH1_FILE, "w") as f:
+            f.write(base64.b64decode(GARMIN_OAUTH1_B64).decode("utf-8"))
+        with open(OAUTH2_FILE, "w") as f:
+            f.write(base64.b64decode(GARMIN_OAUTH2_B64).decode("utf-8"))
+        return True
+    except Exception as e:
+        print(f"[garmin-mcp] falha ao hidratar tokens das env vars: {e}")
+        return False
+
+
+def _login_from_saved_tokens():
+    """Tenta logar usando tokens salvos em /tmp."""
+    if not (os.path.exists(OAUTH1_FILE) and os.path.exists(OAUTH2_FILE)):
+        return None
+    try:
+        client = Garmin()
+        client.login(TOKEN_DIR)
+        print("[garmin-mcp] login com tokens salvos: ok")
+        return client
+    except Exception as e:
+        print(f"[garmin-mcp] login com tokens salvos falhou: {e}")
+        return None
+
+
+def _login_fresh_and_save():
+    """Login com email/senha e salva os tokens para reuso."""
+    print("[garmin-mcp] login fresco com email/senha")
+    client = Garmin(GARMIN_EMAIL, GARMIN_PASSWORD)
+    client.login()
+    try:
+        Path(TOKEN_DIR).mkdir(parents=True, exist_ok=True)
+        client.garth.dump(TOKEN_DIR)
+        print(f"[garmin-mcp] tokens salvos em {TOKEN_DIR}")
+    except Exception as e:
+        print(f"[garmin-mcp] falha ao salvar tokens: {e}")
+    return client
+
+
 def get_client():
+    """
+    Estrategia de login em 3 camadas:
+    1) tokens em /tmp (mesmo container)
+    2) tokens em env var -> hidrata /tmp -> tenta de novo
+    3) login fresco com email/senha (rate-limit risk)
+    """
     global _garmin_client
-    if _garmin_client is None:
-        _garmin_client = Garmin(GARMIN_EMAIL, GARMIN_PASSWORD)
-        _garmin_client.login()
+    if _garmin_client is not None:
+        return _garmin_client
+
+    client = _login_from_saved_tokens()
+    if client is not None:
+        _garmin_client = client
+        return _garmin_client
+
+    if _hydrate_token_dir_from_env():
+        client = _login_from_saved_tokens()
+        if client is not None:
+            _garmin_client = client
+            return _garmin_client
+
+    _garmin_client = _login_fresh_and_save()
     return _garmin_client
 
+
 def safe_call(fn, *args, **kwargs):
+    """
+    Executa uma chamada. Se falhar (token expirado, sessao morta),
+    invalida o client, refaz o login pela mesma cadeia, e tenta de novo uma vez.
+    """
     global _garmin_client
     try:
         return fn(*args, **kwargs)
-    except Exception:
+    except Exception as e:
+        print(f"[garmin-mcp] chamada falhou ({type(e).__name__}: {e}), retentando")
         _garmin_client = None
         client = get_client()
+        # rebind do metodo no novo client
+        method_name = getattr(fn, "__name__", None)
+        if method_name and hasattr(client, method_name):
+            fn = getattr(client, method_name)
         return fn(*args, **kwargs)
+
 
 TOOLS = [
     {
@@ -174,6 +266,7 @@ TOOLS = [
     }
 ]
 
+
 def call_tool(name, args):
     client = get_client()
     args = args or {}
@@ -243,6 +336,7 @@ def call_tool(name, args):
 
     raise ValueError("Ferramenta desconhecida: " + name)
 
+
 def json_rpc(id_, result=None, error=None):
     body = {"jsonrpc": "2.0", "id": id_}
     if error is not None:
@@ -251,12 +345,57 @@ def json_rpc(id_, result=None, error=None):
         body["result"] = result
     return jsonify(body)
 
+
 @app.route("/", methods=["GET"])
 def index():
     key = request.args.get("key")
     if not AUTH_KEY or key != AUTH_KEY:
         return Response("Unauthorized", status=401)
     return Response("Garmin MCP server is running.", status=200)
+
+
+@app.route("/debug/session", methods=["GET"])
+def debug_session():
+    """
+    Endpoint protegido para inspecionar o estado da sessao
+    e extrair os tokens (em base64) para colar como env var no Render.
+    Uso: GET /debug/session?key=AUTH_KEY
+    """
+    key = request.args.get("key")
+    if not AUTH_KEY or key != AUTH_KEY:
+        return Response("Unauthorized", status=401)
+
+    info = {
+        "tmp_oauth1_exists": os.path.exists(OAUTH1_FILE),
+        "tmp_oauth2_exists": os.path.exists(OAUTH2_FILE),
+        "env_oauth1_set": bool(GARMIN_OAUTH1_B64),
+        "env_oauth2_set": bool(GARMIN_OAUTH2_B64),
+        "client_initialized": _garmin_client is not None,
+    }
+
+    # Garante que ha sessao ativa (forca login se necessario)
+    try:
+        get_client()
+        info["login_status"] = "ok"
+    except Exception as e:
+        info["login_status"] = f"erro: {type(e).__name__}: {e}"
+        return jsonify(info)
+
+    # Se ?dump=1, devolve os tokens em base64 para copiar no Render
+    if request.args.get("dump") == "1":
+        try:
+            with open(OAUTH1_FILE, "r") as f:
+                oauth1 = f.read()
+            with open(OAUTH2_FILE, "r") as f:
+                oauth2 = f.read()
+            info["GARMIN_OAUTH1_B64"] = base64.b64encode(oauth1.encode("utf-8")).decode("ascii")
+            info["GARMIN_OAUTH2_B64"] = base64.b64encode(oauth2.encode("utf-8")).decode("ascii")
+            info["instrucao"] = "Copie os 2 valores acima e cole em Environment do Render como GARMIN_OAUTH1_B64 e GARMIN_OAUTH2_B64. Depois remova ?dump=1."
+        except Exception as e:
+            info["dump_error"] = f"{type(e).__name__}: {e}"
+
+    return jsonify(info)
+
 
 @app.route("/", methods=["POST"])
 def mcp():
@@ -278,7 +417,7 @@ def mcp():
             return json_rpc(id_, {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "garmin-mcp", "version": "1.1.0"}
+                "serverInfo": {"name": "garmin-mcp", "version": "1.2.0"}
             })
 
         if method == "tools/list":
@@ -298,6 +437,7 @@ def mcp():
 
     except Exception as e:
         return json_rpc(id_, error={"code": -32603, "message": str(e)})
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
